@@ -4,9 +4,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 # const values
-FEMALE = 'F'
-MALE = 'M'
-x = datetime(2020, 12, 31) #Compensation_Date
+dateDay = datetime(2020, 12, 31) #Compensation_Date
 SALARY_GROWTH_RATE = 0.04
 GROWTH_POWER = 0.5
 W_WOMEN = 64 #RETIRE_AGE_WOMEN
@@ -53,7 +51,7 @@ def get_gen(row):
         return 'F'
 
 def get_x(row):
-    return (relativedelta((x),(row[BIRTH_COL]))).years
+    return (relativedelta((dateDay),(row[BIRTH_COL]))).years
 
 
 
@@ -61,7 +59,7 @@ def get_seniority(row):
     if (row[END_WORK_COL] != '-'):
         return (relativedelta((row[END_WORK_COL]),(row[START_WORK_COL]))).years
     else:
-        return (relativedelta((datetime.now()),(row[START_WORK_COL]))).years
+        return (relativedelta((dateDay),(row[START_WORK_COL]))).years
 
 
 def get_section14rate(row):
@@ -90,7 +88,7 @@ def get_px(W , X,t):
             if (row[1] == X+t+1):
                 return row[Px_COL]
 
-def get_qx(X,t):
+def get_qx1(X,t):
     age = X +t
     if(age <= 29 and age >= 18):
         return dismissal_resignation["A"]["dismissal"]
@@ -103,6 +101,33 @@ def get_qx(X,t):
     else:
         return dismissal_resignation["E"]["dismissal"]
 
+def get_qx2(X,t):
+    age = X +t
+    if(age <= 29 and age >= 18):
+        return dismissal_resignation["A"]["resignation"]
+    elif (age <= 39 and age >= 30):
+        return dismissal_resignation["B"]["resignation"]
+    elif (age <= 49 and age >= 40):
+        return dismissal_resignation["C"]["resignation"]
+    elif (age <= 59 and age >= 50):
+        return dismissal_resignation["D"]["resignation"]
+    else:
+        return dismissal_resignation["E"]["resignation"]
+
+def get_qx3(W,X, t):
+    if (W == 67):
+        rows = men.shape[0]
+        for row in range(1, rows):
+            row = men.iloc[row]
+            if (row[1] == X + t + 1):
+                return row[Qx_COL]
+    else:
+        rows = women.shape[0]
+        for row in range(1, rows):
+            row = women.iloc[row]
+            if (row[1] == X + t + 1):
+                return row[Qx_COL]
+
 def get_dis(t):
     rows = discount.shape[0]
     for row in range(1, rows):
@@ -113,9 +138,9 @@ def get_dis(t):
 
 def getPxAndQxAndDis(W,X,t):
     px = get_px(W, X, t)
-    qx = get_qx(X, t)
+    qx1 = get_qx1(X, t)
     discountrate = get_dis(t)
-    return px,qx,discountrate
+    return px,qx1,discountrate
 
 
 def get_section_1(row):
@@ -148,44 +173,28 @@ def get_section_1(row):
             sum += last_salary * (years * (1-section14percent)) * ((pow(1.4,t+0.5) * px * qx) / discountrate)
 
     print(sum)
-
-
-
-
     return seniority
 
-def prob_to_live_this_year(gender, age, t):
-    probability = 0
-    if gender == FEMALE:
-        num = women.iloc[age - 17 + t][Lx_COL]
-        denum = women.iloc[age - 17][Lx_COL]
-        probability = num / denum
-    else:
-        num = men.iloc[age - 17 + t][Lx_COL]
-        denum = men.iloc[age - 17][Lx_COL]
-        probability = num / denum
-    return probability
 
-
-def prob_to_die_in_t_years(gender, age, t):
-    probability = 0
-    if gender == FEMALE:
-        num = women.iloc[age - 17][Lx_COL] - women.iloc[age - 17 + t][Lx_COL]
-        denum = women.iloc[age - 17][Lx_COL]
-        probability = num / denum
-    else:
-        num = men.iloc[age - 17][Lx_COL] - men.iloc[age - 17 + t][Lx_COL]
-        denum = men.iloc[age - 17][Lx_COL]
-        probability = num / denum
-    return probability
-
+def checkRetirment(row):
+    if(get_gen(row) == 'M'):
+        if(relativedelta((dateDay), (row[BIRTH_COL])).years > W_MEN):
+            return True
+    elif (get_gen(row) == 'W'):
+        if(relativedelta((dateDay), (row[BIRTH_COL])).years > W_WOMEN):
+            return True
+    return False
 
 
 def main():
     rows = data.shape[0]
     for row in range(1, rows):
-        row = data.iloc[13]
-        sum = get_section_1(row)
+        row = data.iloc[row]
+        if (checkRetirment(row)):
+            sum = get_seniority(row) * get_salary(row)
+        else:
+            sum = get_section_1(row)
+
         # print (sum)
         break
         # res_r=has_resignation_reason(row)
