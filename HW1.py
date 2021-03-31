@@ -20,6 +20,7 @@ LAW_14_COL = 7
 LAW_14_percent_COL = 8
 END_WORK_COL = 11
 RESIGNATION_COL = 14
+
 # morality
 Lx_COL = 2
 Dx_COL = 3
@@ -45,13 +46,26 @@ women = pd.read_excel(mortality, 'נשים')
 def get_salary(row):
     return (row[SALARY_COL])
 
+def get_gen(row):
+    if(row[SEX_COL] == 'M'):
+        return 67
+    else:
+        return 64
+
+def get_x(row):
+    return (relativedelta((x),(row[BIRTH_COL]))).years
+
+
+
 def get_seniority(row):
     if (row[END_WORK_COL] != '-'):
         return (relativedelta((row[END_WORK_COL]),(row[START_WORK_COL]))).years
     else:
         return (relativedelta((datetime.now()),(row[START_WORK_COL]))).years
+
 def get_section14percent(row):
     return (row[LAW_14_percent_COL] / 100)
+
 
 def get_section14rate(row):
     if (str(row[LAW_14_COL]) == 'nan'):
@@ -67,7 +81,12 @@ def get_section_1(row):
     seniority = get_seniority(row)
     section14rate = get_section14rate(row)
     section14percent = get_section14percent(row)
-    print (section14percent)
+    W = get_gen(row)
+    X= get_x(row)
+    sigma = W - X - 2
+    #for i in range(0,sigma):
+
+    print (sigma)
     return seniority
 
 def prob_to_live_this_year(gender, age, t):
