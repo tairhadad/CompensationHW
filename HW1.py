@@ -2,6 +2,7 @@ import math
 import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import csv
 
 # const values
 dateDay = datetime(2020, 12, 31) #Compensation_Date
@@ -42,34 +43,49 @@ discount = pd.read_excel(source, 'הנחות')
 men = pd.read_excel(mortality, 'גברים')
 women = pd.read_excel(mortality, 'נשים')
 
-p_rate_men = []
-p_rate_women = []
 Qx = 'q(x)'
 
-def calc_p(df):
+def get_q(age,g):
+    if (g == 'M'):
+        rows = men.shape[0]
+        for row in range(1, rows):
+            row = men.iloc[row]
+            if (row[1] == age):
+                return row[Qx_COL]
+    else:
+        rows = women.shape[0]
+        for row in range(1, rows):
+            row = women.iloc[row]
+            if (row[1] == age):
+                return row[Qx_COL]
+
+
+def calc_p(g):
+    age =18
     p_rate = []
     sum, prev_rate = dismissal_resignation['A']['dismissal']+dismissal_resignation['A']['resignation'], 1
-    for i in range(0,12,1): #18-29
+    p_rate.append(1)
+    for i in range(1,12): #18-29
         p_rate.append((1-sum)*prev_rate)
-        prev_rate = p_rate[i]+df[Qx_COL][i]
+        prev_rate = p_rate[i]+get_q(age+i,g)
     sum = dismissal_resignation['B']['dismissal']+dismissal_resignation['B']['resignation']
-    for i in range(12,22,1): #30-39
+    for i in range(12,22): #30-39
         p_rate.append((1-sum)*prev_rate)
-        prev_rate = p_rate[i]+df[Qx_COL][i]
+        prev_rate = p_rate[i]+get_q(age+i,g)
     sum = dismissal_resignation['C']['dismissal']+dismissal_resignation['C']['resignation']
-    for i in range(22,32,1): #40-49
+    for i in range(22,32): #40-49
         p_rate.append((1-sum)*prev_rate)
-        prev_rate = p_rate[i]+df[Qx_COL][i]
+        prev_rate = p_rate[i]+get_q(age+i,g)
     sum = dismissal_resignation['D']['dismissal'] + \
         dismissal_resignation['D']['resignation']
-    for i in range(32,42,1): # 50-59
+    for i in range(32,42): # 50-59
         p_rate.append((1-sum)*prev_rate)
-        prev_rate = p_rate[i]+df[Qx_COL][i]
+        prev_rate = p_rate[i]+get_q(age+i,g)
     sum = dismissal_resignation['E']['dismissal'] + \
         dismissal_resignation['E']['resignation']
-    for i in range(42, 51, 1): # 60-67
+    for i in range(42, 51): # 60-67
         p_rate.append((1-sum)*prev_rate)
-        prev_rate = p_rate[i]+df[Qx_COL][i]
+        prev_rate = p_rate[i]+get_q(age+i,g)
     return p_rate
 
 
@@ -84,29 +100,22 @@ def get_gen(row):
 def get_x(row):
     return (relativedelta((dateDay),(row[BIRTH_COL]))).years
 
+# def has_law_14(row):
+#     return  not pd.isnull(row[LAW_14_COL])
 
+
+# def salary_seniority(salary, seniority, row, section14rate):
+#     sum = salary*seniority(row)
+#     if has_law_14(row):
+#         l_14_prec = (1 - (section14rate/100))
+#         sum = sum * l_14_prec
+#     return sum
 
 def get_seniority(row):
-    if (row[END_WORK_COL] != '-'):
+    if (row[END_WORK_COL] != '-' and str(row[END_WORK_COL]) != 'nan'):
         return (relativedelta((row[END_WORK_COL]),(row[START_WORK_COL]))).years
     else:
         return (relativedelta((dateDay),(row[START_WORK_COL]))).years
-
-def get_px(W , age):
-    if(age < 18):
-        age=18
-    if(W==67):
-        rows = men.shape[0]
-        for row in range(1, rows):
-            row = men.iloc[row]
-            if( row[1] == age):
-                return row[Px_COL]
-    else:
-        rows = women.shape[0]
-        for row in range(1, rows):
-            row = women.iloc[row]
-            if (row[1] == age):
-                return row[Px_COL]
 
 def get_qx1(age):
     if(age <= 29 and age >= 18):
@@ -168,52 +177,8 @@ def get_section14rate(row):
     else:
         return row[LAW_14_percent_COL], since14
 
-def get_section_1(row):
-    last_salary = get_salary(row)
-    seniority = get_seniority(row)
-    section14rate,years = get_section14rate(row)
-    section14percent = section14rate / 100
-    if (get_gen(row) == 'M'):
-        W = 67
-        p_rate = p_rate_men
-        print(p_rate)
-    else:
-        W = 64
-        p_rate = p_rate_women
-    X = get_x(row)
 
-    sigma = W - X - 2
-    sum = 0
-
-    if(section14percent == 0 ):
-        for t in range(0,sigma):
-            px = get_px(W, X +t +1)
-            qx1 = get_qx1(X+t+1)
-            discountrate = get_dis(t)
-            sum += last_salary * seniority * ((pow(1.4,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
-
-    elif (section14percent == 1):
-        for t in range(0, sigma):
-            px = get_px(W, X +t +1)
-            qx1 = get_qx1(X+t+1)
-            discountrate = get_dis(t)
-            sum += last_salary * (seniority- years) * ((pow(1.4,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
-
-    else:
-        for t in range(0, sigma):
-            px = get_px(W, X +t +1)
-            qx1 = get_qx1(X+t+1)
-            discountrate = get_dis(t)
-            sum += last_salary * (years * (1-section14percent)) * ((pow(1.4,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
-        for t in range(0, sigma):
-            px = get_px(W, X +t +1)
-            qx1 = get_qx1(X+t+1)
-            discountrate = get_dis(t)
-            sum += last_salary * (seniority-years) * ((pow(1.4,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
-
-    return sum
-
-def get_section_2(row):
+def get_section_1(row,p_rate):
     last_salary = get_salary(row)
     seniority = get_seniority(row)
     section14rate,years = get_section14rate(row)
@@ -223,39 +188,83 @@ def get_section_2(row):
     else:
         W = 64
     X = get_x(row)
-    print('last_salary= ' + str(last_salary) + ' seniority = ' + str(seniority) +' section14rate = ' +str(section14rate) + ' years = '+str(years)+ ' section14percent = ' + str(section14percent) + ' Age = ' + str(X))
+
+    sigma = W - X - 2
+    sum = 0
+
+    print("last_salary = " + str(last_salary) + " | seniority = " + str(seniority) + " | section14rate = " + str(section14rate) + " | years = " + str(years))
+    print("section14percent = " + str(section14percent) + " | get_gen(row) = " + str(get_gen(row)) + " | X = " + str(X) + " |  W-X-2 = " + str(sigma))
+    if(section14percent == 0 ):
+        for t in range(0,sigma):
+
+            px = p_rate[t]
+            qx1 = get_qx1(X+t)
+            discountrate = get_dis(t)
+            sum += last_salary * seniority * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
+
+    elif (section14percent == 1):
+        for t in range(0, sigma):
+            px = p_rate[t]
+            qx1 = get_qx1(X+t)
+            discountrate = get_dis(t)
+            sum += last_salary * (seniority- years) * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
+
+    else:
+        for t in range(0, sigma):
+            px = p_rate[t]
+            qx1 = get_qx1(X+t)
+            discountrate = get_dis(t)
+            sum += last_salary * years * (1-section14percent) * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
+        for t in range(0, sigma):
+            px = p_rate[t]
+            qx1 = get_qx1(X+t)
+            discountrate = get_dis(t)
+            sum += last_salary * (seniority-years) * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx1) / pow(discountrate,t+0.5))
+
+    return sum
+
+def get_section_2(row,p_rate):
+    last_salary = get_salary(row)
+    seniority = get_seniority(row)
+    section14rate,years = get_section14rate(row)
+    section14percent = section14rate / 100
+    if (get_gen(row) == 'M'):
+        W = 67
+    else:
+        W = 64
+    X = get_x(row)
 
     sigma = W - X - 2
     sum = 0
 
     if(section14percent == 0 ):
         for t in range(0,sigma):
-            px = get_px(W, X+t+1)
-            qx3 = get_qx3(W,X+t+1)
+            px = p_rate[t]
+            qx3 = get_qx3(W,X+t)
             discountrate = get_dis(t)
-            sum += last_salary * seniority * ((pow(1.4,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
+            sum += last_salary * seniority * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
 
     elif (section14percent == 1):
         for t in range(0, sigma):
-            px = get_px(W, X+t+1)
-            qx3 = get_qx3(W,X+t+1)
+            px = p_rate[t]
+            qx3 = get_qx3(W,X+t)
             discountrate = get_dis(t)
-            sum += last_salary * (seniority- years) * ((pow(1.4,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
+            sum += last_salary * (seniority- years) * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
 
     else:
         for t in range(0, sigma):
-            px = get_px(W, X+t+1)
-            qx3 = get_qx3(W, X+t+1)
+            px = p_rate[t]
+            qx3 = get_qx3(W, X+t)
             discountrate = get_dis(t)
-            sum += last_salary * (years * (1-section14percent)) * ((pow(1.4,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
+            sum += last_salary * (years * (1-section14percent)) * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
         for t in range(0, sigma):
-            px = get_px(W, X+t+1)
-            qx3 = get_qx3(W, X+t+1)
+            px = p_rate[t]
+            qx3 = get_qx3(W, X+t)
             discountrate = get_dis(t)
-            sum += last_salary * (seniority-years) * ((pow(1.4,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
+            sum += last_salary * (seniority-years) * ((pow(1+SALARY_GROWTH_RATE,t+0.5) * px * qx3) / pow(discountrate,t+0.5))
     return sum
 
-def get_section_3(row):
+def get_section_3(row,p_rate):
     assetsValue = get_assetsValue(row)
     if (get_gen(row) == 'M'):
         W = 67
@@ -267,12 +276,12 @@ def get_section_3(row):
     sum = 0
 
     for t in range(0, sigma):
-        px = get_px(W, X+t+1)
+        px = p_rate[t]
         qx2 = get_qx2(X+t+1)
         sum += assetsValue * px * qx2
     return sum
 
-def get_section_4(row):
+def get_section_4(row,p_rate):
     last_salary = get_salary(row)
     seniority = get_seniority(row)
     section14rate,years = get_section14rate(row)
@@ -283,33 +292,117 @@ def get_section_4(row):
         W = 64
     X = get_x(row)
 
-    sigma = W - X - 2
     sum = 0
-    px =0
     if(section14percent == 0 ):
-        for i in range(X,W-1,1):
-            px += get_px(W, i)
+        px = p_rate[W-X-1]
         qx1 = get_qx1(W-1)
-        discountrate = get_dis(t)
-        sum += last_salary * seniority * ((pow(1.4, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X+0.5)))
+        discountrate = get_dis(W-X)
+        sum += last_salary * seniority * ((pow(1+SALARY_GROWTH_RATE, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X+0.5)))
 
     elif (section14percent == 1):
-        for i in range(X,W-1,1):
-            px += get_px(W, i)
+        px = p_rate[W-X-1]
         qx1 = get_qx1(W-1)
-        discountrate = get_dis(t)
-        sum += last_salary * (seniority - years) * ((pow(1.4, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X+0.5)))
+        discountrate = get_dis(W-X)
+        sum += last_salary * (seniority - years) * ((pow(1+SALARY_GROWTH_RATE, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X+0.5)))
 
     else:
-        for i in range(X,W-1,1):
-            px += get_px(W, i)
+        px = p_rate[W-X-1]
         qx1 = get_qx1(W-1)
-        discountrate = get_dis(t)
-        sum += last_salary * (years * (1-section14percent)) * ((pow(1.4, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X + 0.5)))
+        discountrate = get_dis(W-X)
+        sum += last_salary * (years * (1-section14percent)) * ((pow(1+SALARY_GROWTH_RATE, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X + 0.5)))
 
-        sum += last_salary * (seniority-years) * ((pow(1.4, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X+0.5)))
+        sum += last_salary * (seniority-years) * ((pow(1+SALARY_GROWTH_RATE, (W-X+0.5)) * px * qx1) / pow(discountrate, (W-X+0.5)))
 
     return sum
+
+def get_section_5(row,p_rate):
+    last_salary = get_salary(row)
+    seniority = get_seniority(row)
+    section14rate,years = get_section14rate(row)
+    section14percent = section14rate / 100
+    if (get_gen(row) == 'M'):
+        W = 67
+    else:
+        W = 64
+    X = get_x(row)
+
+    sum = 0
+    if(section14percent == 0 ):
+        px = p_rate[W-X-1]
+        qx3 = get_qx3(W, W- 1)
+        discountrate = get_dis(W-X)
+        sum += last_salary * seniority * ((pow(1+SALARY_GROWTH_RATE, (W-X-1+0.5)) * px * qx3) / pow(discountrate, (W-X-1+0.5)))
+
+    elif (section14percent == 1):
+        px = p_rate[W-X-1]
+        qx3 = get_qx3(W, W- 1)
+        discountrate = get_dis(W-X)
+
+        sum += last_salary * (seniority - years) * ((pow(1+SALARY_GROWTH_RATE, (W-X-1+0.5)) * px * qx3) / pow(discountrate, (W-X-1+0.5)))
+
+    else:
+        px = p_rate[W-X-1]
+        qx3 = get_qx3(W, W- 1)
+        discountrate = get_dis(W-X)
+        sum += last_salary * (years * (1-section14percent)) * ((pow(1+SALARY_GROWTH_RATE, (W-X-1+0.5)) * px * qx3) / pow(discountrate, (W-X -1+ 0.5)))
+
+        sum += last_salary * (seniority-years) * ((pow(1+SALARY_GROWTH_RATE, (W-X-1+0.5)) * px * qx3) / pow(discountrate, (W-X-1+0.5)))
+
+    return sum
+
+def get_section_6(row,p_rate):
+    assetsValue = get_assetsValue(row)
+    if (get_gen(row) == 'M'):
+        W = 67
+    else:
+        W = 64
+    X = get_x(row)
+
+    px = p_rate[W-X-1]
+    qx2 = get_qx2(W-1)
+    sum = assetsValue * px * qx2
+    return sum
+
+def get_section_7(row,p_rate):
+    last_salary = get_salary(row)
+    seniority = get_seniority(row)
+    section14rate,years = get_section14rate(row)
+    section14percent = section14rate / 100
+    if (get_gen(row) == 'M'):
+        W = 67
+    else:
+        W = 64
+    X = get_x(row)
+
+    sum = 0
+    if(section14percent == 0 ):
+        px = p_rate[W-X-1]
+        qx1 = get_qx1(W-1)
+        qx2 = get_qx2(W-1)
+        qx3 = get_qx3(W,W-1)
+        discountrate = get_dis(W-X)
+        sum += last_salary * seniority * ((pow(1+SALARY_GROWTH_RATE, (W-X)) * px * (1-qx1 - qx2 - qx3)) / pow(discountrate, (W-X)))
+
+    elif (section14percent == 1):
+        px = p_rate[W-X-1]
+        qx1 = get_qx1(W-1)
+        qx2 = get_qx2(W - 1)
+        qx3 = get_qx3(W, W - 1)
+        discountrate = get_dis(W-X)
+        sum += last_salary * (seniority - years) * ((pow(1+SALARY_GROWTH_RATE, (W-X)) * px * (1-qx1 - qx2 - qx3)) / pow(discountrate, (W-X)))
+
+    else:
+        px = p_rate[W-X-1]
+        qx1 = get_qx1(W-1)
+        qx2 = get_qx2(W - 1)
+        qx3 = get_qx3(W, W - 1)
+        discountrate = get_dis(W-X)
+        sum += last_salary * (years * (1-section14percent)) * ((pow(1+SALARY_GROWTH_RATE, (W-X)) * px * (1-qx1 - qx2 - qx3)) / pow(discountrate, (W-X )))
+
+        sum += last_salary * (seniority-years) * ((pow(1+SALARY_GROWTH_RATE, (W-X)) * px * (1-qx1 - qx2 - qx3)) / pow(discountrate, (W-X)))
+
+    return sum
+
 
 def checkRetirment(row):
     if(get_gen(row) == 'M'):
@@ -322,17 +415,26 @@ def checkRetirment(row):
 
 
 def main():
-    p_rate_men = calc_p(men)
-    p_rate_women = calc_p(women)
+    p_rate_men = calc_p('M')
+    print(p_rate_men)
+    p_rate_women = calc_p('F')
+    #print(p_rate_men)
     rows = data.shape[0]
     for row in range(1, rows):
-        row = data.iloc[13]
+        row = data.iloc[16]
         if (checkRetirment(row)):
             sum = get_seniority(row) * get_salary(row)
         else:
-            sum = get_section_1(row) + get_section_2(row) + get_section_3(row) + get_section_4(row)
+            p_rate = p_rate_men if get_gen(row) == 'M' else p_rate_women
 
+            sum = get_section_1(row,p_rate) + get_section_2(row,p_rate) + get_section_3(row,p_rate) + get_section_4(row,p_rate) + get_section_5(row,p_rate)  + get_section_6(row,p_rate) + get_section_7(row,p_rate)
         print(sum)
         break
+        # with open('results.csv', 'a', newline='') as csvfile:
+        #     fieldnames = ['first_name', 'last_name', 'results']
+        #     writer = csv.writer(csvfile)
+        #     writer.writerow([row[1], row[2], sum*2])
+        #     csvfile.close()
+
 
 main()
