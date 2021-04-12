@@ -192,8 +192,6 @@ def get_section_1(row,p_rate):
     sigma = W - X - 2
     sum = 0
 
-    print("last_salary = " + str(last_salary) + " | seniority = " + str(seniority) + " | section14rate = " + str(section14rate) + " | years = " + str(years))
-    print("section14percent = " + str(section14percent) + " | get_gen(row) = " + str(get_gen(row)) + " | X = " + str(X) + " |  W-X-2 = " + str(sigma))
     if(section14percent == 0 ):
         for t in range(0,sigma):
 
@@ -416,25 +414,22 @@ def checkRetirment(row):
 
 def main():
     p_rate_men = calc_p('M')
-    print(p_rate_men)
     p_rate_women = calc_p('F')
-    #print(p_rate_men)
     rows = data.shape[0]
     for row in range(1, rows):
-        row = data.iloc[16]
+        row = data.iloc[row]
         if (checkRetirment(row)):
             sum = get_seniority(row) * get_salary(row)
         else:
             p_rate = p_rate_men if get_gen(row) == 'M' else p_rate_women
 
             sum = get_section_1(row,p_rate) + get_section_2(row,p_rate) + get_section_3(row,p_rate) + get_section_4(row,p_rate) + get_section_5(row,p_rate)  + get_section_6(row,p_rate) + get_section_7(row,p_rate)
-        print(sum)
-        break
-        # with open('results.csv', 'a', newline='') as csvfile:
-        #     fieldnames = ['first_name', 'last_name', 'results']
-        #     writer = csv.writer(csvfile)
-        #     writer.writerow([row[1], row[2], sum*2])
-        #     csvfile.close()
+        with open('results.csv', 'a', newline='') as csvfile:
+            fieldnames = ['first_name', 'last_name', 'results']
+            writer = csv.writer(csvfile)
+            writer.writerow([row[1], row[2], sum*2])
+            csvfile.close()
+    print("DONE")
 
 
 main()
