@@ -412,7 +412,7 @@ def main():
     p_rate_women = calc_p('F')
     rows = data.shape[0]
     for row in range(1, rows):
-        row = data.iloc[row]
+        row = data.iloc[19]
         if (checkRetirment(row)):
             sum = get_seniority(row) * get_salary(row)
         else:
@@ -423,6 +423,7 @@ def main():
             writer = csv.writer(csvfile)
             writer.writerow([row[1], row[2], sum])
             csvfile.close()
+        break
 
     print("DONE")
 
