@@ -21,6 +21,10 @@ END_WORK_COL = 11
 RESIGNATION_COL = 14
 ASSETS_COL = 9
 
+ASSETS_PAYMENT_COL = 12
+CompletionByCheck_COL = 13
+
+
 # morality
 Lx_COL = 2
 Dx_COL = 3
@@ -93,17 +97,38 @@ def calc_p(g):
         prev_rate = p_rate[i]+get_q(age+i,g)
     return p_rate
 
-
-
 def get_salary(row):
     return (row[SALARY_COL])
 
+def get_paidBenefits(row):
+    assetsPayment = row[ASSETS_PAYMENT_COL]
+    if (str(row[CompletionByCheck_COL]) == 'nan'):
+        check = 0
+    else:
+        check = row[CompletionByCheck_COL]
+
+    return assetsPayment + check
+
+#return the sex of a person given a row
 def get_gen(row):
     return 'M' if row[SEX_COL] else 'F'
 
-
+# return the age of a person given a row
 def get_x(row):
     return (relativedelta((dateDay),(row[BIRTH_COL]))).years
+
+#calculate how many months in the year the worker has been worked
+def monthsInYear(row):
+    if (str(row[END_WORK_COL])=='nan' or row[END_WORK_COL]=='-'):
+        return 1
+    else:
+        dt = datetime.strptime(str(row[END_WORK_COL]), '%Y-%m-%d %H:%M:%S')
+        year = dt.year
+        if (str(year) != '2020'):
+            return 0
+        else:
+            print(relativedelta((dateDay), (row[END_WORK_COL])))
+            return (12 - ((relativedelta((dateDay), (row[END_WORK_COL]))).months))/12
 
 
 def get_seniority(row):
@@ -112,6 +137,7 @@ def get_seniority(row):
     else:
         return (relativedelta((dateDay),(row[START_WORK_COL]))).years
 
+# return the probability that person was resigned from his job
 def get_qx1(age):
     if(age <= 29 and age >= 18):
         return dismissal_resignation["A"]["dismissal"]
@@ -124,6 +150,7 @@ def get_qx1(age):
     else:
         return dismissal_resignation["E"]["dismissal"]
 
+# return the probability that person was fired from his job
 def get_qx2(age):
     if(age <= 29 and age >= 18):
         return dismissal_resignation["A"]["resignation"]
@@ -136,6 +163,7 @@ def get_qx2(age):
     else:
         return dismissal_resignation["E"]["resignation"]
 
+# return the probability to die given an age (age-18) and retirement age
 def get_qx3(W,age):
     if (W == 67):
         rows = men.shape[0]
@@ -407,6 +435,76 @@ def checkRetirment(row):
     return False
 
 
+# שיעור היוון
+def get_discountRate(numOfYears):
+    discountDict = {}
+    rows = discount.shape[0]
+    for row in range(3, rows):
+        row = discount.iloc[row]
+        discountDict[row[0]]= round(row[1],4)
+    if (numOfYears in discountDict):
+        return discountDict[numOfYears]
+    return 0
+
+# calculate the service expectancy of a person
+def serviceExpectancy(row):
+    sum = 0
+    currentAge = get_x(row)
+    lastRes = 1
+    age = currentAge
+    sexuality = get_gen(row)
+    if(sexuality == 'F'):
+        retirementAge=64
+    else:
+        retirementAge = 67
+
+    while(age<retirementAge):
+        result  = 1 - get_qx1(age)- get_qx2(age) - get_qx3(retirementAge,age)
+        result = result*lastRes
+        sum = sum + result
+        lastRes= result
+        age= age+1
+    sum = round(sum,0)
+    #print('sum is:',sum)
+    res = get_discountRate(sum)
+    #print('res is:',res)
+    return res
+
+
+#חישוב עלות היוון
+def discountCost (row, onGoingServiceRes):
+    val = 125700 #נתון
+    paidVal = get_paidBenefits(row)
+    res = val * serviceExpectancy(row) + (onGoingServiceRes - paidVal)*(serviceExpectancy(row)/2)
+    return res
+
+#עלות שירות שוטף
+def ongoingService(row):
+    val = 125184
+    law14 = 0
+
+    if (str(row[LAW_14_percent_COL]) == 'nan'):
+        law14 = 0
+    else:
+        law14 = row[LAW_14_percent_COL] / 100
+        if(law14==1):
+            return 0
+
+    actoariFactor = row[SALARY_COL] * get_seniority(row) * (1-(law14))
+    if (actoariFactor==0):
+        return 0
+
+    actoariFactor =val / actoariFactor
+    result = row[SALARY_COL] * (monthsInYear(row)) * (1-law14) * actoariFactor
+    return round(result, 2)
+
+#הפסד או רווח אקטוארי בהתחייבות
+def actuarialProfit(closingBalance,onGoingServiceRes,serviceExpectancyRes,benefitsPaid):
+    x = 123000 # נתון
+    res = closingBalance-x-onGoingServiceRes-serviceExpectancyRes + benefitsPaid
+    return res
+
+
 def main():
     p_rate_men = calc_p('M')
     p_rate_women = calc_p('F')
@@ -418,8 +516,19 @@ def main():
         else:
             p_rate = p_rate_men if get_gen(row) == 'M' else p_rate_women
             sum = get_section_1(row,p_rate) + get_section_2(row,p_rate) + get_section_3(row,p_rate) + get_section_4(row,p_rate) + get_section_5(row,p_rate)  + get_section_6(row,p_rate) + get_section_7(row,p_rate)
+
+        #calculation of part 2
+        #Ongoing service
+        onGoingServiceRes = ongoingService(row)
+        serviceExpectancyRes =serviceExpectancy(row)
+        #חישוב עלות היוון
+        disVal = discountCost(row,onGoingServiceRes)
+        #חישוב הטבות ששולמו
+        benefitsPaid =get_paidBenefits(row)
+        actuarialProfitRes = actuarialProfit(sum,onGoingServiceRes,serviceExpectancyRes,benefitsPaid)
+
         with open('results.csv', 'a', newline='') as csvfile:
-            fieldnames = ['first_name', 'last_name', 'results']
+            fieldnames = ['first_name', 'last_name', 'results1']
             writer = csv.writer(csvfile)
             writer.writerow([row[1], row[2], sum])
             csvfile.close()
