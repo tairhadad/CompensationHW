@@ -17,10 +17,10 @@ START_WORK_COL = 5
 SALARY_COL = 6
 LAW_14_COL = 7
 LAW_14_percent_COL = 8
-END_WORK_COL = 11
 RESIGNATION_COL = 14
 ASSETS_COL = 9
-
+DEPOSIT = 10
+END_WORK_COL = 11
 ASSETS_PAYMENT_COL = 12
 CompletionByCheck_COL = 13
 
@@ -99,6 +99,8 @@ def calc_p(g):
 
 def get_salary(row):
     return (row[SALARY_COL])
+def get_deposit(row):
+    return (row[DEPOSIT])
 
 def get_paidBenefits(row):
     assetsPayment = row[ASSETS_PAYMENT_COL]
@@ -504,6 +506,13 @@ def actuarialProfit(closingBalance,onGoingServiceRes,serviceExpectancyRes,benefi
     res = closingBalance-x-onGoingServiceRes-serviceExpectancyRes + benefitsPaid
     return res
 
+#חישוב תשואה צפויה על נכסי התוכנית
+def calac4 (row):
+    val = get_deposit(row) # הפקדות לנכסי תוכנית
+    val2 = 115,000 # שווי הוגן של נכסי התוכנית נתון
+    paidVal = get_paidBenefits(row) #חישוב הטבות ששולמו
+    res = val2 * serviceExpectancy(row) + (val - paidVal)*(serviceExpectancy(row)/2)
+    return res
 
 def main():
     p_rate_men = calc_p('M')
