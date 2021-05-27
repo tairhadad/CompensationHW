@@ -509,9 +509,18 @@ def actuarialProfit(closingBalance,onGoingServiceRes,serviceExpectancyRes,benefi
 #חישוב תשואה צפויה על נכסי התוכנית
 def calac4 (row):
     val = get_deposit(row) # הפקדות לנכסי תוכנית
-    val2 = 115,000 # שווי הוגן של נכסי התוכנית נתון
+    val2 = 90000 # שווי הוגן של נכסי התוכנית נתון
     paidVal = get_paidBenefits(row) #חישוב הטבות ששולמו
     res = val2 * serviceExpectancy(row) + (val - paidVal)*(serviceExpectancy(row)/2)
+    return res
+
+def calac5 (row):
+    val1 = get_assetsValue(row) # נכסי תוכנית - סגירה
+    val2 = 90000 # שווי הוגן של נכסי התוכנית פתיחה
+    val3 = calac4(row) #חישוב תשואה צפויה על נכסי התוכנית
+    val4 = get_deposit(row) # הפקדות לנכסי תוכנית
+    paidVal = get_paidBenefits(row) #חישוב הטבות ששולמו
+    res = val1 - val2 - val3 - val4 + paidVal
     return res
 
 def main():
@@ -519,7 +528,7 @@ def main():
     p_rate_women = calc_p('F')
     rows = data.shape[0]
     for row in range(1, rows):
-        row = data.iloc[19]
+        row = data.iloc[row]
         if (checkRetirment(row)):
             sum = get_seniority(row) * get_salary(row)
         else:
@@ -541,7 +550,7 @@ def main():
             writer = csv.writer(csvfile)
             writer.writerow([row[1], row[2], sum])
             csvfile.close()
-        break
+
 
     print("DONE")
 
