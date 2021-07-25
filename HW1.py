@@ -102,6 +102,12 @@ def get_salary(row):
 def get_deposit(row):
     return (row[DEPOSIT])
 
+def get_resignation(row):
+    if (str(row[RESIGNATION_COL]) == 'התפטרות'):
+        return True
+    return False
+
+
 def get_paidBenefits(row):
     assetsPayment = row[ASSETS_PAYMENT_COL]
     if (str(row[CompletionByCheck_COL]) == 'nan'):
@@ -122,6 +128,7 @@ def get_x(row):
 #calculate how many months in the year the worker has been worked
 def monthsInYear(row):
     if (str(row[END_WORK_COL])=='nan' or row[END_WORK_COL]=='-'):
+
         return 1
     else:
         dt = datetime.strptime(str(row[END_WORK_COL]), '%Y-%m-%d %H:%M:%S')
@@ -461,7 +468,7 @@ def serviceExpectancy(row):
         retirementAge = 67
 
     while(age<retirementAge):
-        result  = 1 - get_qx1(age)- get_qx2(age) - get_qx3(retirementAge,age)
+        result  = 1 - get_qx1(age) - get_qx2(age) - get_qx3(retirementAge,age)
         result = result*lastRes
         sum = sum + result
         lastRes= result
@@ -475,48 +482,47 @@ def serviceExpectancy(row):
 
 #חישוב עלות היוון
 def discountCost (row, onGoingServiceRes):
-    val = 125700 #נתון
+    val = 200000 #ערך נוכחי התחייבות - יתרת פתיחה
     paidVal = get_paidBenefits(row)
     res = val * serviceExpectancy(row) + (onGoingServiceRes - paidVal)*(serviceExpectancy(row)/2)
     return res
 
 #עלות שירות שוטף
-def ongoingService(row):
-    val = 125184
-    law14 = 0
-
+def ongoingService(row,closingBalance):
     if (str(row[LAW_14_percent_COL]) == 'nan'):
         law14 = 0
+
     else:
         law14 = row[LAW_14_percent_COL] / 100
         if(law14==1):
-            return 0
+            return 0,0
 
-    actoariFactor = row[SALARY_COL] * get_seniority(row) * (1-(law14))
+    actoariFactor = row[SALARY_COL] * (1/3) * (1-(law14))
     if (actoariFactor==0):
-        return 0
-
-    actoariFactor =val / actoariFactor
+        return 0,0
+    actoariFactor =closingBalance / actoariFactor
     result = row[SALARY_COL] * (monthsInYear(row)) * (1-law14) * actoariFactor
-    return round(result, 2)
+
+    return round(result, 2),actoariFactor
 
 #הפסד או רווח אקטוארי בהתחייבות
 def actuarialProfit(closingBalance,onGoingServiceRes,serviceExpectancyRes,benefitsPaid):
-    x = 123000 # נתון
+    x = 200000 # ערך נוכחי התחייבות - יתרת פתיחה
     res = closingBalance-x-onGoingServiceRes-serviceExpectancyRes + benefitsPaid
     return res
 
 #חישוב תשואה צפויה על נכסי התוכנית
 def calac4 (row):
     val = get_deposit(row) # הפקדות לנכסי תוכנית
-    val2 = 90000 # שווי הוגן של נכסי התוכנית נתון
+    val2 = 100000 # שווי הוגן של נכסי התוכנית נתון
     paidVal = get_paidBenefits(row) #חישוב הטבות ששולמו
     res = val2 * serviceExpectancy(row) + (val - paidVal)*(serviceExpectancy(row)/2)
     return res
 
+# רווח/הפסד אקטואלי
 def calac5 (row):
     val1 = get_assetsValue(row) # נכסי תוכנית - סגירה
-    val2 = 90000 # שווי הוגן של נכסי התוכנית פתיחה
+    val2 = 100000 # שווי הוגן של נכסי התוכנית פתיחה
     val3 = calac4(row) #חישוב תשואה צפויה על נכסי התוכנית
     val4 = get_deposit(row) # הפקדות לנכסי תוכנית
     paidVal = get_paidBenefits(row) #חישוב הטבות ששולמו
@@ -537,18 +543,34 @@ def main():
 
         #calculation of part 2
         #Ongoing service
-        onGoingServiceRes = ongoingService(row)
+        onGoingServiceRes,factor = ongoingService(row,sum)
         serviceExpectancyRes =serviceExpectancy(row)
         #חישוב עלות היוון
         disVal = discountCost(row,onGoingServiceRes)
         #חישוב הטבות ששולמו
         benefitsPaid =get_paidBenefits(row)
         actuarialProfitRes = actuarialProfit(sum,onGoingServiceRes,serviceExpectancyRes,benefitsPaid)
+        # חישוב תשואה צפויה על נכסי התוכנית
+        calc4 = calac4(row)
+
+        # הפקדות
+        deposit=get_deposit(row)
+
+
+        # שווי הנכס במידה ולא עזב
+        assetsValue = 0 if get_resignation(row) else get_assetsValue(row)
+
+        # רווח/הפסד אקטואלי
+        calc5 = calac5(row)
+        fieldnames = ['מספר עובד', 'יתרת פתיחה', 'עלות שירות שוטף', 'עלות היוון', 'הטבות ששולמו', 'הםסד אקטוארי',
+                      'יתרת סגירה', 'פקטור אקטוארי', '', 'יתרת פתיחה', 'תשואה צפויה', 'הפקדות', 'הטבות ששולמו מהנכסים',
+                      'רווח אקטוארי', 'יתרת סגירה']
 
         with open('results.csv', 'a', newline='') as csvfile:
-            fieldnames = ['first_name', 'last_name', 'results1']
             writer = csv.writer(csvfile)
-            writer.writerow([row[1], row[2], sum])
+            # writer.writerow(fieldnames)
+            # writer.writerow([row[1], row[2], sum])
+            writer.writerow([row[0],200000,onGoingServiceRes,disVal,benefitsPaid,factor,sum,actuarialProfitRes,"" , 100000,calc4,deposit,benefitsPaid,calc5,assetsValue])
             csvfile.close()
 
 
